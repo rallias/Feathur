@@ -147,7 +147,7 @@ then
 	INTERFACES=$(for i in $(ip link show | sed 'N;s/\n/ /' | grep ether | grep -v 'NO-CARRIER' | awk -F: '{print $2}' | awk '{print $1}'); do echo -n $i; done)
 	status "What is your trunk interface?"
 	status "If your interface is not on the list, check your ethernet cable."
-	FEATHUR_INTERFACE=$(selectValid($INTERFACES))
+	FEATHUR_INTERFACE=$INTERFACES[$(selectValid($INTERFACES))]
 fi
 
 PACKAGES=()
@@ -164,6 +164,9 @@ case $FEATHUR_MODE in
 			else
 				REPOS+=("https://raw.githubusercontent.com/BlueVM/Feathur/Testing/data/nginx-rhel7.repo")
 			fi
+			PACKAGES2+=("php" "php-fpm" "php-mysql" "mysql-server" "zip" "unzip" "pigz")
+		else
+			
 		fi
 		;;
 	1)
@@ -174,9 +177,9 @@ case $FEATHUR_VIRT in
 	0)
 		if [[ $FEATHUR_OS_NAME == "CentOS" ]]
 		then
-			PACKAGES+=("rsync" "screen" "wget")
+			PACKAGES2+=("rsync" "screen" "wget" "pigz")
 		else
-			PACKAGES+=("screen" "wget")
+			PACKAGES+=("screen" "wget" "pigz")
 		fi
 		;;
 	1)
@@ -190,21 +193,43 @@ case $FEATHUR_VIRT in
 			then
 				PACKAGES+=( "http://download.fedoraproject.org/pub/epel/7/x86_64/e/epel-release-7-2.noarch.rpm")
 			fi
-			PACKAGES2+=("vnstat")
+			PACKAGES2+=("vnstat" "pigz")
 		else
-			PACKAGES+=("qemu-kvm" "libvirt-bin" "bridge-utils" "screen" "wget")
+			PACKAGES+=("qemu-kvm" "libvirt-bin" "bridge-utils" "screen" "wget" "pigz")
 		fi
 		;;
 	2)
 		if [[ $FEATHUR_OS_NAME == "CentOS" && $FEATHUR_OS_RELEASE -eq 6 ]]
 		then
-			PACKAGES+=("rsync" "screen" "wget")
+			PACKAGES+=("rsync" "screen" "wget" "pigz")
 			REPOS=("http://download.openvz.org/openvz.repo")
-			PACKAGES2+=("vzkernel")
+			PACKAGES2+=("vzkernel" "vzctl")
 		fi
 		;;
 esac
 
+case $FEATHUR_OS_NAME in
+	CentOS)
+		yum -y install $PACKAGES
+		CURRENTDIR=$(pwd)
+		cd /etc/yum.repos.d/
+		for i in $REPOS
+		do
+			wget $i
+		done
+		cd $CURRENTDIR
+		yum -y install $PACKAGES2
+		;;
+	Debian)
+	Ubuntu)
+		apt-get -y install $PACKAGES
+		for i in $REPOS
+		do
+			echo $i >> /etc/apt/sources.list.d/feathur.list
+		done
+		apt-get -y install $PACKAGES2
+		;;
+esac
 
 if [[ $FEATHUR_OS_NAME == "CentOS" ]]
 then
